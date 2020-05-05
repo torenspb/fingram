@@ -4,3 +4,4 @@ This Telegram messenger bot simply copies your costs that are provided with mess
 You then can use Google sheet to track all your costs using existing or creating personalized financial templates.  
 
 ![Alt text](./examples/sshot.png?raw=true "Usage example")
+![Alt text](./examples/gsheet.png?raw=true "Usage example")
