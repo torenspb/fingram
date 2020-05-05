@@ -1,5 +1,5 @@
 {
-    "gsheet_secret": "<client_secret.json> // file with google OAuth ID",
+    "gsheet_service_secret": "<service_acc_secret.json> // json file with a service secret key",
     "gsheet_name": "<finance> // name of the sheet to which costs will be added",
     "telegram": {
         "token": "<213456789> // telegram bot token",

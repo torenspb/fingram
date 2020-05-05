@@ -1,2 +1,3 @@
-client_secret.json
+service_acc_secret.json
 variables.local.json
+__pycache__/
