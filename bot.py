@@ -13,7 +13,7 @@ def autorize_user(message):
                          "if you think you're VIP (ha-ha, nope).")
     else:
         try:
-            add_costs(message.text)
+            add_costs(message.from_user.id, message.text)
             bot.send_message(message.from_user.id,
                              "Your cost has been added!")
         except:

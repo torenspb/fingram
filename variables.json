@@ -1,8 +1,12 @@
 {
-    "gsheet_service_secret": "<service_acc_secret.json> // json file with a service secret key",
-    "gsheet_name": "<finance> // name of the sheet to which costs will be added",
+    "gsheet": {
+        "service_secret": "<service_acc_secret.json> // json file with a service secret key",
+        "sheets": {
+            "123456789": "<https://docs.google.com/spreadsheets/d/qwertyasdfgh1234/edit> // link to the google sheet used to store data for that specific telegram used",
+            "987654321": "<https://docs.google.com/spreadsheets/d/hgfdsaytrewq54321/edit#gid=0>  // link to the google sheet used to store data for that specific telegram user"
+        }
+    },
     "telegram": {
-        "token": "<213456789> // telegram bot token",
-        "allowed_users":[123456789, 987654321]
+        "token": "<213456789> // telegram bot token"
     }
 }

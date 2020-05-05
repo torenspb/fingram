@@ -9,15 +9,15 @@ VAR_FILE = '/variables.json'
 with open(VAR_DIR + VAR_FILE, 'r') as f:
     settings = json.load(f)
 
-SHEET_NAME = settings['gsheet_name']
-SERVICE_KEY = VAR_DIR + '/' + settings['gsheet_service_secret']
+SHEETS = settings['gsheet']['sheets']
+SERVICE_KEY = VAR_DIR + '/' + settings['gsheet']['service_secret']
 TOKEN = settings['telegram']['token']
-ALLOWED_IDs = settings['telegram']['allowed_users']
+ALLOWED_IDs = [int(user) for user in settings['gsheet']['sheets'].keys()]
 
 
-def get_sheet(name, secret_path):
+def get_sheet(sheet_url, secret_path):
     gc = pygsheets.authorize(service_file=secret_path)
-    sh = gc.open(name)
+    sh = gc.open_by_url(sheet_url)
     sheet = sh.sheet1
     return sheet
 
@@ -33,10 +33,11 @@ def add_row(sheet, index, values):
     sheet.update_row(index, values)
 
 
-def add_costs(message):
+def add_costs(user, message):
     note = message.split(' ', 1)
     current_date = date.today().strftime("%d.%m.%Y")
     note.insert(0, current_date)
-    my_sheet = get_sheet(SHEET_NAME, SERVICE_KEY)
+    sheet_url = SHEETS[str(user)]
+    my_sheet = get_sheet(sheet_url, SERVICE_KEY)
     next_empty_row = get_empty_row(my_sheet, 1)
     add_row(my_sheet, next_empty_row, note)
