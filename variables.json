@@ -2,7 +2,7 @@
     "gsheet": {
         "service_secret": "<service_acc_secret.json> // json file with a service secret key",
         "sheets": {
-            "123456789": "<https://docs.google.com/spreadsheets/d/qwertyasdfgh1234/edit> // link to the google sheet used to store data for that specific telegram used",
+            "123456789": "<https://docs.google.com/spreadsheets/d/qwertyasdfgh1234/edit> // link to the google sheet used to store data for that specific telegram user",
             "987654321": "<https://docs.google.com/spreadsheets/d/hgfdsaytrewq54321/edit#gid=0>  // link to the google sheet used to store data for that specific telegram user"
         }
     },
