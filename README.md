@@ -22,11 +22,20 @@ Needed artifacts from this step - telegram bot token.
 1. Create a Google sheet under your account and share this document with your serivce account email.  
 This will get your application an access to write costs.  
 
-2. Fill in `variables.json` with correct parameters.  
+2. Fill in `variables.json` with correct parameters:  
 * `service_secret` is a json file with a service secret key you have for your google app
 * `sheets` section maps telegram user id to the google sheet used to write the data. That is a link to the google sheet created in the previous step. Multiple telegram accounts with their own google sheets can be specified. Only telegram IDs specified within this section are allowed to use the bot. If you don't know your telegram id, you can simply print `message.from_user.id` value to get it.
 * `token` within the `telegram` section is the Telegram token of your bot.  
 
 ### Deployment
 To run the bot, install pip requirements at first and issue the `python3 bot.py` command. That's it.  
-To run the bot in the background mode, a Docker can be used as an option (if running a process in background isn't suitable).  
+To run the bot in the background mode, a Docker can be used as an option (if running a process in background isn't suitable):
+```
+[root@ fingram]# docker build -t fingram .
+[root@ fingram]# docker run --name fingram -d fingram
+d96f6af5de4ec45c87decc7fd72fe2324de209cc2842277fdf3ee48ec4eeaa63
+[root@ fingram]# docker ps
+CONTAINER ID        IMAGE                            COMMAND                  CREATED             STATUS              PORTS                  NAMES
+d96f6af5de4e        fingram                          "python /opt/fingr..."   2 seconds ago       Up 1 second                                fingram
+[root@ fingram]#
+```
