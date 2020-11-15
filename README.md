@@ -40,3 +40,15 @@ CONTAINER ID        IMAGE                            COMMAND                  CR
 d96f6af5de4e        fingram                          "python /opt/fingr..."   2 seconds ago       Up 1 second                                fingram
 [root@ fingram]#
 ```
+
+### Deployment on a remote machine
+In case you want to deploy this app on a remote server, a build-in ansible `provision.yml` can be used.
+First you need to export environment variables with your local variables and secret key files:
+```
+export FINGRAM_LOCAL_VARS="variables.local.json"
+export FINGRAM_ACC_SECRET="service_acc_secret.json"
+```
+Then simply run a playbook specifying remote machine address:
+```
+ansible-playbook -i '13.13.13.13, ' provision.yml
+```

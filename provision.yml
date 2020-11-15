@@ -1,0 +1,31 @@
+---
+- hosts: all
+  vars:
+      app_name: "fingram"
+      app_folder: "~/fingram"
+      local_vars: "{{ lookup('env','FINGRAM_LOCAL_VARS') }}"
+      local_secret: "{{ lookup('env','FINGRAM_ACC_SECRET') }}"
+  become: yes
+  tasks:
+          - name: Install git on a remote machine
+            yum:
+                    name: git
+                    state: latest
+
+          - name: Clone latest fingram repo
+            git:
+                    repo: https://github.com/torenspb/fingram.git
+                    dest: "{{ app_folder }}"
+                    force: yes
+
+          - name: Upload correct variable file and key
+            template: src={{item.src}} dest={{item.dest}}
+            with_items:
+                - { src: '{{ local_vars }}', dest: '{{ app_folder }}/variables.json' }
+                - { src: '{{ local_secret }}', dest: '{{ app_folder }}/{{ local_secret }}' }
+
+          - name: Build a fingram docker container
+            shell: cd {{ app_folder }} && docker build -t {{ app_name }} .
+
+          - name: Run a fingram docker container
+            shell: cd {{ app_folder }} && docker run --name {{ app_name }} -d {{ app_name }}
