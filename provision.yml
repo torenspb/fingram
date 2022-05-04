@@ -21,4 +21,4 @@
               - { src: '{{ local_secret }}', dest: '{{ app_folder }}/{{ local_secret }}' }
 
         - name: Run fingram docker container
-          shell: cd {{ app_folder }} && docker run -d --rm --name {{ app_name }} -v $(pwd):{{ vars_folder }} {{ app_name }}
+          shell: cd {{ app_folder }} && docker run -d --rm --name {{ app_name }} -v $(pwd):{{ vars_folder }} {{ app_repo }}
