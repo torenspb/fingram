@@ -3,7 +3,7 @@ import json
 import pygsheets
 from datetime import date
 
-VAR_DIR = os.path.dirname(__file__)
+VAR_DIR = os.path.dirname(__file__) + '/vars'
 VAR_FILE = '/variables.json'
 
 with open(VAR_DIR + VAR_FILE, 'r') as f:
