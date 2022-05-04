@@ -29,20 +29,14 @@ This will get your application an access to write costs.
 
 ### Deployment
 To run the bot, install required packages using pip at first and issue the `python3 bot.py` command. That's it.  
-To run the bot in the background mode, a Docker can be used as an option (if running a process in background isn't suitable).
-Dockerfile for the bot is also included within this repo, so you can build and run a container as follow:
+Docker can also be used to run the app, just run:  
 ```
-[root@ fingram]# docker build -t fingram .
-[root@ fingram]# docker run --name fingram -d fingram
-d96f6af5de4ec45c87decc7fd72fe2324de209cc2842277fdf3ee48ec4eeaa63
-[root@ fingram]# docker ps
-CONTAINER ID        IMAGE                            COMMAND                  CREATED             STATUS              PORTS                  NAMES
-d96f6af5de4e        fingram                          "python /opt/fingr..."   2 seconds ago       Up 1 second                                fingram
-[root@ fingram]#
+docker run -v --rm --name fingram -v $(pwd):/opt/fingram/vars spolikarpov/fingram:latest
 ```
+where `$(pwd)` contains `variables.json` and `service_acc_secret.json` files.  
 
 ### Deployment on a remote machine
-In case you want to deploy this app on a remote server, a build-in ansible `provision.yml` can be used.
+In case you want to deploy this app on a remote server, a build-in ansible `provision.yml` can be used.  
 First you need to export environment variables with your local variables and secret key files:
 ```
 export FINGRAM_LOCAL_VARS="variables.local.json"
@@ -52,3 +46,17 @@ Then simply run a playbook specifying remote machine address:
 ```
 ansible-playbook -i '13.13.13.13, ' provision.yml
 ```
+
+### Building
+Dockerfile for the bot is also included within this repo, so you can build and run a container as follow:
+```
+[root@ fingram]# docker build -t fingram .
+[root@ fingram]# docker run --name fingram -v $(pwd):/opt/fingram/var -d fingram
+d96f6af5de4ec45c87decc7fd72fe2324de209cc2842277fdf3ee48ec4eeaa63
+[root@ fingram]# docker ps
+CONTAINER ID        IMAGE                            COMMAND                  CREATED             STATUS              PORTS                  NAMES
+d96f6af5de4e        fingram                          "python /opt/fingr..."   2 seconds ago       Up 1 second                                fingram
+[root@ fingram]#
+```
+
+
