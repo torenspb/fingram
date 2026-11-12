@@ -1,0 +1,10 @@
+{
+  "gsheet": {
+    "service_secret": "service_acc_secret.json",
+    "sheets": {
+      "123456789": "https://docs.google.com/spreadsheets/d/REPLACE_ME/edit"
+    }
+  },
+  "telegram": {"token": "REPLACE_ME"},
+  "timezone": "Europe/Tallinn"
+}

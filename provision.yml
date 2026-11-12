@@ -1,24 +1,43 @@
 ---
+# Requires Docker Engine and the Compose plugin on the target.
 - hosts: all
+  become: true
   vars:
-      app_name: "fingram"
-      app_repo: "spolikarpov/fingram:latest"
-      app_folder: "~/fingram"
-      vars_folder: /opt/fingram/vars
-      local_vars: "{{ lookup('env','FINGRAM_LOCAL_VARS') }}"
-      local_secret: "{{ lookup('env','FINGRAM_ACC_SECRET') }}"
-  become: yes
+    app_folder: /opt/fingram
+    local_vars: "{{ lookup('env', 'FINGRAM_LOCAL_VARS') }}"
+    local_secret: "{{ lookup('env', 'FINGRAM_ACC_SECRET') }}"
   tasks:
-        - name: Create application folder
-          file:
-            path: '{{ app_folder }}'
-            state: directory
-
-        - name: Upload correct variable file and key
-          template: src={{item.src}} dest={{item.dest}}
-          with_items:
-              - { src: '{{ local_vars }}', dest: '{{ app_folder }}/variables.json' }
-              - { src: '{{ local_secret }}', dest: '{{ app_folder }}/{{ local_secret }}' }
-
-        - name: Run fingram docker container
-          shell: cd {{ app_folder }} && docker run -d --rm --name {{ app_name }} -v $(pwd):{{ vars_folder }} {{ app_repo }}
+    - name: Create application directory
+      ansible.builtin.file:
+        path: '{{ app_folder }}'
+        state: directory
+        mode: '0755'
+    - name: Create private credential directory
+      ansible.builtin.file:
+        path: '{{ app_folder }}/vars'
+        state: directory
+        owner: '10001'
+        group: '10001'
+        mode: '0700'
+    - name: Copy reviewed application and deployment files
+      ansible.builtin.copy:
+        src: '{{ item }}'
+        dest: '{{ app_folder }}/{{ item }}'
+        mode: '0644'
+      loop: [Dockerfile, requirements.txt, bot.py, main.py, compose.yaml, .dockerignore]
+    - name: Copy private configuration and service account key
+      ansible.builtin.copy:
+        src: '{{ item.src }}'
+        dest: '{{ app_folder }}/vars/{{ item.dest }}'
+        owner: '10001'
+        group: '10001'
+        mode: '0600'
+      no_log: true
+      diff: false
+      loop:
+        - {src: '{{ local_vars }}', dest: variables.local.json}
+        - {src: '{{ local_secret }}', dest: service_acc_secret.json}
+    - name: Build and start the bot
+      ansible.builtin.command:
+        argv: [docker, compose, up, -d, --build]
+        chdir: '{{ app_folder }}'
