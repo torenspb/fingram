@@ -1,62 +1,93 @@
 # Fingram
 
-This Telegram messenger bot simply copies your costs that are provided with messages to the Google sheet.  
-You then can use Google sheet to track all your costs using existing or creating personal financial templates.  
-Bot consider to be private, meaning you specify which Telegram accounts can interact with the bot.
+A single-user Telegram bot that appends expenses to Google Sheets.
+Send `12.50 lunch` in your private chat with the bot. Negative amounts (refunds)
+and decimal commas are accepted; descriptions are limited to 500 characters.
+Columns A–C contain date (displayed as `dd.mm.yyyy`), numeric amount and literal description.
+Formulas in descriptions are stored as text. Use a dedicated contiguous table on
+the first worksheet, optionally with a header row; keep unrelated tables elsewhere.
+New expenses are appended after the last populated row of that worksheet.
 
-![Alt text](./examples/example.png "Usage example")
+## Configuration
 
+Create a Telegram bot through BotFather and a dedicated Google service account.
+Enable the Sheets API, download its JSON key, and share only your expense sheet
+with the service account as an editor. No project-wide Editor role or domain-wide
+delegation is needed. Disable group invitations through BotFather as an extra precaution.
 
-## Usage
-### Prerequisites
-1. You need to create a new Google APP project, enable Sheets and Drive API for it and create a service account.  
-More information on that can be found within Google developer docs, but it's really not necessary to go deeper into that and I'd say that steps from the pygsheet documentation should be enough for our needs:  
-https://pygsheets.readthedocs.io/en/latest/authorization.html  
-Needed artifacts from this step - service account email and service account secret key (json-formatted).  
-
-2. You need to register a new Telegram bot.  
-Write to Bot Father https://t.me/botfather and follow the instructions.  
-Needed artifacts from this step - telegram bot token.  
-
-### Configuration
-1. Create a Google sheet under your account and share the sheet with your service account email.  
-This will get your application an access to write costs.  
-
-2. Fill in `variables.json` with correct parameters:  
-* `service_secret` is a json file with a service secret key you have for your google app  
-* `sheets` section maps telegram user id to the google sheet used to write the data. That is a link to the google sheet created in the previous step. Multiple telegram accounts with their own google sheets can be specified. Only telegram IDs specified within this section are allowed to use the bot. If you don't know your telegram id, you can simply print `message.from_user.id` value within the `bot.py`  to get it  
-* `token` within the `telegram` section is the Telegram token of your bot  
-
-### Deployment
-To run the bot, install required packages using pip at first and issue the `python3 bot.py` command. That's it.  
-Docker can also be used to run the app, just run:  
-```
-docker run -v --rm --name fingram -v $(pwd):/opt/fingram/vars spolikarpov/fingram:latest
-```
-where `$(pwd)` contains `variables.json` and `service_acc_secret.json` files.  
-
-### Deployment on a remote machine
-In case you want to deploy this app on a remote server, a build-in ansible `provision.yml` can be used.  
-First you need to export environment variables with your local variables and secret key files:
-```
-export FINGRAM_LOCAL_VARS="variables.local.json"
-export FINGRAM_ACC_SECRET="service_acc_secret.json"
-```
-Then simply run a playbook specifying remote machine address:
-```
-ansible-playbook -i '13.13.13.13, ' provision.yml
+```sh
+cp vars/variables.example.json vars/variables.local.json
+chmod 700 vars
+chmod 600 vars/variables.local.json
 ```
 
-### Building
-Dockerfile for the bot is also included within this repo, so you can build and run a container as follow:
-```
-[root@ fingram]# docker build -t fingram .
-[root@ fingram]# docker run --name fingram -v $(pwd):/opt/fingram/var -d fingram
-d96f6af5de4ec45c87decc7fd72fe2324de209cc2842277fdf3ee48ec4eeaa63
-[root@ fingram]# docker ps
-CONTAINER ID        IMAGE                            COMMAND                  CREATED             STATUS              PORTS                  NAMES
-d96f6af5de4e        fingram                          "python /opt/fingr..."   2 seconds ago       Up 1 second                                fingram
-[root@ fingram]#
+Copy the Google key to `vars/service_acc_secret.json` and `chmod 600` that file.
+Edit `variables.local.json`: set your numeric Telegram user ID, sheet URL, token
+and optionally timezone (defaults to `Europe/Tallinn`, Estonia). Exactly one user is supported. The key filename is relative to the
+configuration directory. The old tracked `vars/variables.json` is now an example
+file; migrate real settings to `variables.local.json`. Never commit credentials.
+Rotate credentials if they have previously been published.
+
+## Docker Compose (Intel Linux or 64-bit Raspberry Pi OS)
+
+Install Docker Engine with the Compose and Buildx plugins. The same Dockerfile
+uses Python 3.15.2 and supports `linux/amd64` and `linux/arm64`; Compose builds for
+the host architecture automatically. No inbound ports or router forwarding are needed.
+
+Run the container with your unprivileged Linux user's UID/GID so it can read the
+private credential files you own (do not run these commands from a root login):
+
+```sh
+printf 'FINGRAM_UID=%s\nFINGRAM_GID=%s\n' "$(id -u)" "$(id -g)" > .env
+docker compose up -d --build
+docker compose logs --tail=50 bot
 ```
 
+Alternatively, keep the default container UID/GID 10001 and make that account the
+owner of the credential directory and its files. Compose mounts credentials
+read-only, uses a read-only root filesystem, drops capabilities and rotates logs.
+Run only one instance per Telegram token.
 
+To build both architectures into a registry image (requires a Buildx builder with
+both architectures available, through native nodes or QEMU):
+
+```sh
+docker buildx create --name fingram-builder --driver docker-container --use
+docker buildx build --platform linux/amd64,linux/arm64 -t YOUR_REGISTRY/fingram:VERSION --push .
+```
+
+To deploy that image on either machine, set `FINGRAM_IMAGE=YOUR_REGISTRY/fingram:VERSION`
+in `.env`, then run `docker compose pull && docker compose up -d --no-build`.
+Use a version tag or manifest digest you control. Rebuild periodically with
+`docker compose build --pull` and recreate with `docker compose up -d` for base
+image security updates; review pinned Python/dependency upgrades periodically.
+
+## Local execution and remote provisioning
+
+Use a supported Python (the container uses 3.15.2):
+
+```sh
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python bot.py
+```
+
+Run from the repository directory, or set `FINGRAM_CONFIG` to an absolute config
+path. `provision.yml` copies the reviewed source, sets private credential
+permissions, and builds on the remote host. It requires Docker and Compose there.
+Set `FINGRAM_LOCAL_VARS` and `FINGRAM_ACC_SECRET` to your local files, then run
+`ansible-playbook -i 'YOUR_PI_ADDRESS,' provision.yml`. For this playbook, configure
+`service_secret` as `service_acc_secret.json`.
+
+## Failure behavior and tests
+
+Writes are server-side appends and handlers run sequentially. Failed writes are
+not automatically retried: a timeout can occur after Google committed a row.
+If told to check the sheet, inspect it before resending. A failed Telegram
+confirmation does not repeat the spreadsheet write. Polling reconnects after
+errors; logs contain operation names and exception types, not exception bodies.
+This does not provide exactly-once delivery across crashes/restarts.
+
+```sh
+.venv/bin/python -m unittest discover -s tests -v
+```

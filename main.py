@@ -1,43 +1,80 @@
-import os
+"""Configuration, validation and append-only expense storage."""
 import json
-import pygsheets
-from datetime import date
-
-VAR_DIR = os.path.dirname(__file__) + '/vars'
-VAR_FILE = '/variables.json'
-
-with open(VAR_DIR + VAR_FILE, 'r') as f:
-    settings = json.load(f)
-
-SHEETS = settings['gsheet']['sheets']
-SERVICE_KEY = VAR_DIR + '/' + settings['gsheet']['service_secret']
-TOKEN = settings['telegram']['token']
-ALLOWED_IDs = [int(user) for user in settings['gsheet']['sheets'].keys()]
+import os
+import re
+from datetime import date, datetime
+from decimal import Decimal
+from pathlib import Path
+from zoneinfo import ZoneInfo
 
 
-def get_sheet(sheet_url, secret_path):
-    gc = pygsheets.authorize(service_file=secret_path)
-    sh = gc.open_by_url(sheet_url)
-    sheet = sh.sheet1
-    return sheet
+def load_settings(path=None):
+    path = Path(path or os.environ.get('FINGRAM_CONFIG', 'vars/variables.local.json'))
+    with path.open() as stream:
+        settings = json.load(stream)
+    sheets = settings['gsheet']['sheets']
+    if len(sheets) != 1 or not all(k.isdecimal() and int(k) > 0 for k in sheets):
+        raise ValueError('Configure exactly one positive Telegram user ID')
+    secret = Path(settings['gsheet']['service_secret'])
+    if not secret.is_absolute():
+        secret = path.parent / secret
+    settings['gsheet']['service_secret'] = str(secret)
+    if not re.fullmatch(r'\d+:[A-Za-z0-9_-]+', settings['telegram']['token']):
+        raise ValueError('Invalid Telegram token configuration')
+    for url in sheets.values():
+        if not re.fullmatch(r'https://docs\.google\.com/spreadsheets/d/[A-Za-z0-9_-]+(?:/[^\s]*)?', url):
+            raise ValueError('Invalid spreadsheet URL')
+    ZoneInfo(settings.get('timezone', 'Europe/Tallinn'))
+    return settings
 
 
-def get_empty_row(sheet, col):
-    all_cols = sheet.get_col(col, returnas='cell', include_tailing_empty=False)
-    last_col = all_cols[-1].address.index
-    next_row = last_col[0] + 1
-    return next_row
+def parse_expense(text):
+    parts = text.strip().split(maxsplit=1)
+    if len(parts) != 2 or not re.fullmatch(r'-?\d{1,10}(?:[.,]\d{1,2})?', parts[0]):
+        raise ValueError('Use: 12.50 description (at most two decimal places)')
+    description = parts[1].strip()
+    if not description or len(description) > 500 or any(ord(c) < 32 for c in description):
+        raise ValueError('Description must contain 1–500 characters without control characters')
+    return float(Decimal(parts[0].replace(',', '.'))), description
 
 
-def add_row(sheet, index, values):
-    sheet.update_row(index, values)
+class ExpenseStore:
+    def __init__(self, settings):
+        from google.auth.transport.requests import AuthorizedSession
+        from google.oauth2.service_account import Credentials
+        self.settings = settings
+        credentials = Credentials.from_service_account_file(
+            settings['gsheet']['service_secret'],
+            scopes=['https://www.googleapis.com/auth/spreadsheets'])
+        # No transport retries or automatic replay after a 401 on an append.
+        self.session = AuthorizedSession(credentials, max_refresh_attempts=0)
 
-
-def add_costs(user, message):
-    note = message.split(' ', 1)
-    current_date = date.today().strftime("%d.%m.%Y")
-    note.insert(0, current_date)
-    sheet_url = SHEETS[str(user)]
-    my_sheet = get_sheet(sheet_url, SERVICE_KEY)
-    next_empty_row = get_empty_row(my_sheet, 1)
-    add_row(my_sheet, next_empty_row, note)
+    def append(self, user, amount, description):
+        url = self.settings['gsheet']['sheets'][str(user)]
+        spreadsheet_id = re.search(r'/d/([A-Za-z0-9_-]+)', url).group(1)
+        endpoint = 'https://sheets.googleapis.com/v4/spreadsheets/' + spreadsheet_id
+        response = self.session.get(endpoint, params={'fields': 'sheets(properties(sheetId,index))'},
+                                    timeout=30, allow_redirects=False)
+        response.raise_for_status()
+        sheets = response.json()['sheets']
+        sheet_id = min(sheets, key=lambda s: s['properties']['index'])['properties']['sheetId']
+        today = datetime.now(ZoneInfo(self.settings.get('timezone', 'Europe/Tallinn'))).date()
+        serial_date = (today - date(1899, 12, 30)).days
+        # Typed cells store an actual date while keeping descriptions literal.
+        # Append values and formatting together, without a second write or retries.
+        response = self.session.post(
+            endpoint + ':batchUpdate',
+            json={'requests': [{'appendCells': {
+                'sheetId': sheet_id,
+                'rows': [{'values': [
+                    {'userEnteredValue': {'numberValue': serial_date},
+                     'userEnteredFormat': {'numberFormat': {'type': 'DATE', 'pattern': 'dd.mm.yyyy'}}},
+                    {'userEnteredValue': {'numberValue': amount}},
+                    {'userEnteredValue': {'stringValue': description}},
+                ]}],
+                'fields': 'userEnteredValue,userEnteredFormat.numberFormat',
+            }}]},
+            timeout=30, allow_redirects=False)
+        response.raise_for_status()
+        if response.status_code != 200:
+            raise RuntimeError('Unexpected append response')

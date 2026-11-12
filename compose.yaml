@@ -1,0 +1,24 @@
+services:
+  bot:
+    image: ${FINGRAM_IMAGE:-fingram:local}
+    build: .
+    user: "${FINGRAM_UID:-10001}:${FINGRAM_GID:-10001}"
+    restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - type: bind
+        source: ./vars
+        target: /opt/fingram/vars
+        read_only: true
+        bind:
+          create_host_path: false
+    tmpfs:
+      - /tmp:size=16m,mode=1777,noexec,nosuid
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: "2"
